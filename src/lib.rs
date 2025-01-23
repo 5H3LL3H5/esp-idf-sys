@@ -1,88 +1,87 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+//! Raw Rust bindings for the [ESP-IDF SDK](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/).
+//!
+//! # Build Prerequisites
+//!
+//! Follow the [Prerequisites](https://github.com/esp-rs/esp-idf-template#prerequisites) section in the `esp-idf-template` crate.
+//!
+#![doc = include_str!("../BUILD-OPTIONS.md")]
+#![no_std]
+#![cfg_attr(
+    all(not(feature = "std"), feature = "alloc_handler"),
+    feature(alloc_error_handler)
+)]
+#![allow(unknown_lints)]
+#![allow(renamed_and_removed_lints)]
+#![allow(unexpected_cfgs)]
 
 pub use bindings::*;
 pub use error::*;
-pub use mutex::EspMutex;
 
-pub mod error;
-pub mod mutex;
+// Don't use esp_idf_soc_pcnt_supported; that's only on ESP-IDF v5.x+.
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c6, esp32h2))]
+pub use pcnt::*;
+
+#[doc(hidden)]
+pub use build_time;
+#[doc(hidden)]
+pub use const_format;
+#[doc(hidden)]
+pub use patches::PatchesRef;
+
+#[cfg(feature = "std")]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate std;
+
+#[cfg(feature = "alloc")]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate alloc;
 
 mod alloc;
+mod app_desc;
+mod error;
 mod panic;
+mod patches;
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c6, esp32h2))]
+mod pcnt;
+
 mod start;
 
-// (Temporary code) ESP-IDF does not (yet) have a pthread rwlock implementation, which is required by STD
-// We provide a quick and very hacky implementation here
-#[cfg(feature = "std")]
-mod pthread_rwlock;
-
-// (Temporary code) ESP-IDF current stable version (4.3) has atomics for ESP32S2, but not for ESP32C3
-// The ESP-IDF master branch has atomics for both
-#[cfg(all(esp32c3, esp_idf_version = "4.3"))]
-mod atomics_esp32c3;
-
-/// A hack to make sure that the rwlock implementation and the esp32c3 atomics are linked to the final executable
-/// Call this function once e.g. in the beginning of your main function
+/// If any of the two constants below do not compile, you have not properly setup the rustc cfg flag `espidf_time64`:
+/// When compiling against ESP-IDF V5.X or later, you need to define the following in your `.config/cargo.toml` file
+/// (look for this file in the root of your binary crate):
+/// ```
+/// [build]
+/// rustflags = "--cfg espidf_time64"
+/// ```
 ///
-/// This function will become no-op once ESP-IDF V4.4 is released
-pub fn link_patches() -> (*mut c_types::c_void, *mut c_types::c_void) {
-    #[cfg(feature = "std")]
-    let rwlock = pthread_rwlock::link_patches();
-
-    #[cfg(not(feature = "std"))]
-    let rwlock = core::ptr::null_mut();
-
-    #[cfg(all(esp32c3, esp_idf_version = "4.3"))]
-    let atomics = atomics_esp32c3::link_patches();
-
-    #[cfg(not(all(esp32c3, esp_idf_version = "4.3")))]
-    let atomics = core::ptr::null_mut();
-
-    (rwlock, atomics)
-}
-
+/// When compiling against ESP-IDF V4.X, you need to remove the above flag
+#[allow(deprecated)]
+#[allow(unused)]
 #[cfg(feature = "std")]
-#[allow(non_upper_case_globals)]
-#[allow(non_camel_case_types)]
-pub mod c_types {
-    pub type c_void = std::os::raw::c_void;
-    pub type c_uchar = std::os::raw::c_uchar;
-    pub type c_schar = std::os::raw::c_schar;
-    pub type c_char = std::os::raw::c_char;
-    pub type c_short = std::os::raw::c_short;
-    pub type c_ushort = std::os::raw::c_ushort;
-    pub type c_int = std::os::raw::c_int;
-    pub type c_uint = std::os::raw::c_uint;
-    pub type c_long = std::os::raw::c_long;
-    pub type c_ulong = std::os::raw::c_ulong;
-    pub type c_longlong = std::os::raw::c_longlong;
-    pub type c_ulonglong = std::os::raw::c_ulonglong;
-}
+const ESP_IDF_TIME64_CHECK: ::std::os::espidf::raw::time_t = 0 as crate::time_t;
+#[allow(unused)]
+const ESP_IDF_TIME64_CHECK_LIBC: ::libc::time_t = 0 as crate::time_t;
 
-#[cfg(not(feature = "std"))]
-#[allow(non_upper_case_globals)]
-#[allow(non_camel_case_types)]
-pub mod c_types {
-    pub type c_void = core::ffi::c_void;
-    pub type c_uchar = u8;
-    pub type c_schar = i8;
-    pub type c_char = i8;
-    pub type c_short = i16;
-    pub type c_ushort = u16;
-    pub type c_int = i32;
-    pub type c_uint = u32;
-    pub type c_long = i32;
-    pub type c_ulong = u32;
-    pub type c_longlong = i64;
-    pub type c_ulonglong = u64;
+/// A hack to make sure that a few patches to the ESP-IDF which are implemented in Rust
+/// are linked to the final executable
+///
+/// Call this function once at the beginning of your main function
+pub fn link_patches() -> PatchesRef {
+    patches::link_patches()
 }
 
 #[allow(clippy::all)]
 #[allow(non_upper_case_globals)]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
+#[allow(rustdoc::all)]
+#[allow(improper_ctypes)] // TODO: For now, as 5.0 spits out tons of these
+#[allow(dead_code)]
 mod bindings {
-    use super::c_types;
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c6, esp32h2))]
+    use crate::pcnt::*;
 
     include!(env!("EMBUILD_GENERATED_BINDINGS_FILE"));
 }

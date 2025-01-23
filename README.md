@@ -1,108 +1,75 @@
-# Rust bindings for ESP-IDF (Espressif's IoT Development Framework)
+# Raw Rust bindings for the [ESP IDF SDK](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)
 
-## Background
+[![CI](https://github.com/esp-rs/esp-idf-sys/actions/workflows/ci.yml/badge.svg)](https://github.com/esp-rs/esp-idf-sys/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/esp-idf-sys.svg)](https://crates.io/crates/esp-idf-sys)
+[![Documentation](https://img.shields.io/badge/docs-esp--rs-brightgreen)](https://esp-rs.github.io/esp-idf-sys/esp_idf_sys/index.html)
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&color=BEC5C9&logo=matrix)](https://matrix.to/#/#esp-rs:matrix.org)
+[![Wokwi](https://img.shields.io/endpoint?url=https%3A%2F%2Fwokwi.com%2Fbadge%2Fclick-to-simulate.json)](https://wokwi.com/projects/332188235906155092)
 
-The ESP-IDF API in Rust, with support for each ESP chip (ESP32, ESP32S2, ESP32C3 etc.) based on the Rust target
+## Highlights
 
-![CI](https://github.com/esp-rs/esp-idf-sys/actions/workflows/ci.yml/badge.svg)
+- Build is `cargo` driven and **automatically downloads & configures everything by default**; no need to download the ESP IDF SDK manually, or set up a C toolchain
+- Supports both native ESP IDF build (default), as well as a PlatformIO build
+- Option to use in a mixed Rust/C project. Check the documentation in the [esp-idf-template](https://github.com/esp-rs/esp-idf-template) crate
 
-## Build
+**You might want to also check out the type safe Rust wrappers built on top of these raw bindings:**
+- [Type safe wrappers for ESP IDF Services](https://github.com/esp-rs/esp-idf-svc)
+- [Type safe wrappers for ESP IDF Drivers](https://github.com/esp-rs/esp-idf-hal)
 
-- The build requires the [Rust ESP32 STD compiler fork](https://github.com/esp-rs/rust) to be configured and installed as per the instructions there.
-- The relevant Espressif toolchain, as well as the `esp-idf` itself are all automatically
-  downloaded during the build by
-    - with the feature `pio` (default): utilizing [platformio](https://platformio.org/) (via
-        the [embuild](https://github.com/ivmarkov/embuild) crate) or
-    - with the feature `native` (*experimental*): utilizing native `esp-idf` tooling.
-- Check the [mini](https://github.com/ivmarkov/rust-esp32-std-mini) crate for a "Hello, world!" Rust template demonstrating how to use and build this crate
-- Check the [demo](https://github.com/ivmarkov/rust-esp32-std-demo) crate for a more comprehensive example in terms of capabilities
+> **Note**  
+> `esp-idf-sys`'s [build
+> script](https://doc.rust-lang.org/cargo/reference/build-scripts.html) will download the
+> esp-idf, its gcc toolchain, and build it. To show progress and build information about
+> this process run cargo with the `-vv` (very verbose) flag, so that build script output
+> is also displayed. This is especially useful since the initial build will take a while.
 
-## Feature `pio`
-This is currently the default for installing all build tools and building the ESP-IDF framework. It uses [PlatformIO](https://platformio.org/) via the
-[embuild](https://github.com/ivmarkov/embuild) crate.
+## Build Prerequisites
 
-## Feature `native`
-This is an experimental feature for downloading all tools and building the ESP-IDF framework using the framerosk's "native" own tooling.
-It will become the default in the near future.
-It also relies on build and installation utilities available in the [embuild](https://github.com/ivmarkov/embuild) crate.
+Follow the [Prerequisites](https://github.com/esp-rs/esp-idf-template#prerequisites) section in the `esp-idf-template` crate.
 
-Currently, this build script installs all needed tools to compile the `esp-idf` as well as
-the `esp-idf` itself using `embuild::espidf::Installer`.  There are two locations where
-the `esp-idf` source and tools are detected and installed:
+## Customizing how the ESP IDF SDK is built
 
-- **`~/.espressif`**
-- **`$ESP_IDF_INSTALL_DIR`** or **`<crate workspace-dir>/.embuild/espressif`**
+Read the [documentation here](BUILD-OPTIONS.md).
 
-### Bluetooth Support
+## Examples
 
-In order to enable Bluetooth support with either Bluedroid or NimBLE, there is some additional work:
-* Go to the root of your **binary crate** project (e.g., the ["Hello, World" demo](https://github.com/ivmarkov/rust-esp32-std-hello))
-* Create a `.cargo/config.toml` file if it does not exist there yet. You can copy it from the ["Hello, World" demo](https://github.com/ivmarkov/rust-esp32-std-hello)
-* Include in it the following:
-```toml
-[env]
-...
-ESP_IDF_SYS_GLOB_0 = { value = "/sdkconfig" }
-```
-* Next, create a file `sdkconfig` at the root of binary crate your project. This could be generated with `cargo pio espidf menuconfig` if you install `cargo-pio` (see below) but a minimal manual example follows:
-```c
-CONFIG_BT_ENABLED=y
-CONFIG_BTDM_CTRL_MODE_BLE_ONLY=y
-CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY=n
-CONFIG_BTDM_CTRL_MODE_BTDM=n
-// Uncomment whichever of these you need
-//CONFIG_BT_BLUEDROID_ENABLED=y
-//CONFIG_BT_NIMBLE_ENABLED=y
+The examples could be built and flashed conveniently with [`cargo-espflash`](https://github.com/esp-rs/espflash/). To run e.g. `std_basics` on an e.g. ESP32-C3:
+(Swap the Rust target and example name with the target corresponding for your ESP32 MCU and with the example you would like to build)
+
+with `cargo-espflash`:
+```sh
+$ MCU=esp32c3 cargo espflash flash --target riscv32imc-esp-espidf --example std_basics --monitor
 ```
 
-### Using cargo-pio to interactively modify ESP-IDF's `sdkconfig` file
+| MCU | "--target" |
+| --- | ------ |
+| esp32c2 | riscv32imc-esp-espidf |
+| esp32c3| riscv32imc-esp-espidf |
+| esp32c6| riscv32imac-esp-espidf |
+| esp32h2 | riscv32imac-esp-espidf |
+| esp32p4 | riscv32imafc-esp-espidf |
+| esp32 | xtensa-esp32-espidf |
+| esp32s2 | xtensa-esp32s2-espidf |
+| esp32s3 | xtensa-esp32s3-espidf |
 
-To enable Bluetooth, or do other configurations to the ESP-IDF sdkconfig you might take advantage of the cargo-pio Cargo subcommand:
-* To install it, issue `cargo install cargo-pio --git https://github.com/ivmarkov/cargo-pio`
-* To open the ESP-IDF interactive menuconfig system, issue `cargo pio espidf menuconfig` in the root of your **binary crate** project
-* To use the generated/updated `sdkconfig` file, follow the steps described in the "Bluetooth Support" section
 
-### More info
+## Setting up a "Hello, world!" binary crate with ESP IDF
 
-If you are interested how it all works under the hood, check the [build_pio.rs](build.rs)
-or  script of this crate.
+Use the [esp-idf-template](https://github.com/esp-rs/esp-idf-template) project. Everything would be arranged and built for you automatically - no need to manually clone the ESP IDF repository.
 
-### Requirements
-- If using chips other than `esp32c3`:
-    - [Rust ESP32 compiler fork](https://github.com/esp-rs/rust)
-    - [libclang of the xtensa LLVM fork](https://github.com/espressif/llvm-project/releases)
-- `python >= 3.7`
+## More information
 
-### Configuration
-Environment variables are used to configure how the `esp-idf` is compiled.
-The following environment variables are used by the build script:
+For more information, check out:
+- The [Rust on ESP Book](https://esp-rs.github.io/book/)
+- The [ESP Embedded Training](https://github.com/esp-rs/espressif-trainings)
+- The [esp-idf-template](https://github.com/esp-rs/esp-idf-template) project
+- The [esp-idf-svc](https://github.com/esp-rs/esp-idf-svc) project
+- The [esp-idf-hal](https://github.com/esp-rs/esp-idf-hal) project
+- The [embedded-svc](https://github.com/esp-rs/embedded-svc) project
+- The [embedded-hal](https://github.com/rust-embedded/embedded-hal) project
+- The [Rust for Xtensa toolchain](https://github.com/esp-rs/rust-build)
+- The [Rust-with-STD demo](https://github.com/ivmarkov/rust-esp32-std-demo) project
 
-- `ESP_IDF_INSTALL_DIR`:
+## Known limitations
 
-    The path to the directory where all esp-idf tools are installed. If it is set to a
-    relative path, it is relative to the crate workspace-dir.
-
-    If not set, when `ESP_IDF_GLOBAL_INSTALL` is set to `1` it defaults to the global
-    install dir `~/.espressif`, otherwise it defaults to the local install dir `<crate
-    workspace-dir>/.embuild/espressif`.
-
-- `ESP_IDF_GLOBAL_INSTALL`
-
-    If set to `1`, `true`, `y` or `yes` uses the global install directory only when `ESP_IDF_INSTALL_DIR` is not specified.
-
-- `ESP_IDF_VERSION`:
-  The version used for the `esp-idf` can be one of the following:
-  - `commit:<hash>`: Uses the commit `<hash>` of the `esp-idf` repository.
-                     Note that this will clone the whole `esp-idf` not just one commit.
-  - `tag:<tag>`: Uses the tag `<tag>` of the `esp-idf` repository.
-  - `branch:<branch>`: Uses the branch `<branch>` of the `esp-idf` repository.
-  - `v<major>.<minor>` or `<major>.<minor>`: Uses the tag `v<major>.<minor>` of the `esp-idf` repository.
-  - `<branch>`: Uses the branch `<branch>` of the `esp-idf` repository.
-
-  It defaults to `v4.3`.
-- `ESP_IDF_REPOSITORY`: The URL to the git repository of the `esp-idf`, defaults to <https://github.com/espressif/esp-idf.git>.
-- `ESP_IDF_SDKCONFIG_DEFAULTS`: A `;`-separated list of paths to `sdkconfig.default` files to be used as base
-                                values for the `sdkconfig`.
-- `ESP_IDF_SDKCONFIG`: A path (absolute or relative) to the esp-idf `sdkconfig` file.
-- `MCU`: The mcu name (e.g. `esp32` or `esp32c3`). If not set this will be automatically
-         detected from the cargo target.
+* ESP IDF can’t be compiled on filesystems without support for symbolic links (e.g. FAT)
